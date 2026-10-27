@@ -12,7 +12,7 @@ async function setup(form: FormData) {
   if (!key || !safeEqual(s("setupKey"), key)) redirect("/setup?e=key");
   const slug = s("slug").toLowerCase().replace(/[^a-z0-9-]/g, "");
   if (!slug || !s("name") || !/^\S+@\S+\.\S+$/.test(s("email")) || s("password").length < 10) redirect("/setup?e=fields");
-  if (await db.tenant.findUnique({ where: { slug } })) redirect("/setup?e=slug");
+  if (await db.tenant.findUnique({ where: { slug } })) redirect(`/setup?e=slug&slug=${slug}`);
   await createTenantWithOwner({
     slug,
     name: s("name"),
@@ -29,7 +29,7 @@ const ERRORS: Record<string, string> = {
   slug: "That web address is already taken. Choose another.",
 };
 
-export default async function Setup({ searchParams }: { searchParams: { e?: string } }) {
+export default async function Setup({ searchParams }: { searchParams: { e?: string; slug?: string } }) {
   const count = await db.tenant.count();
   return (
     <main className="page wrap">
@@ -39,7 +39,13 @@ export default async function Setup({ searchParams }: { searchParams: { e?: stri
           <h1>{count ? "Add a funeral home" : "Set up your first funeral home"}</h1>
           <p className="muted">This creates the funeral home with starter plans and benefits, plus its owner login. You can change everything later in Admin → Settings.</p>
         </div>
-        {searchParams.e && <p className="flash bad">{ERRORS[searchParams.e] ?? "Something went wrong."}</p>}
+        {searchParams.e === "slug" && searchParams.slug ? (
+          <p className="flash bad">
+            A funeral home already uses /{searchParams.slug}. If it's yours, <a href={`/${searchParams.slug}/admin/login`}>sign in to its admin</a>. Otherwise choose a different web address.
+          </p>
+        ) : searchParams.e ? (
+          <p className="flash bad">{ERRORS[searchParams.e] ?? "Something went wrong."}</p>
+        ) : null}
         <label className="f">Setup key<input id="setupKey" name="setupKey" type="password" autoComplete="off" required /></label>
         <label className="f">Funeral home name<input id="name" name="name" type="text" placeholder="e.g. Ekuthuleni Funeral Home" required /></label>
         <div className="grid2">
