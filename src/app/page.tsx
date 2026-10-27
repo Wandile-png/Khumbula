@@ -17,7 +17,7 @@ export default async function Home() {
             <div className="muted small">{t.tagline}</div>
           </Link>
         ))}
-        {!tenants.length && <p className="muted">No funeral homes yet. Run <code>npm run db:seed</code>.</p>}
+        {!tenants.length && <p className="muted">No funeral homes yet. <Link href="/setup">Set up the first one</Link>.</p>}
       </div>
     </main>
   );
