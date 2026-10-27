@@ -1,0 +1,35 @@
+{
+  "name": "khumbula",
+  "version": "0.1.0",
+  "private": true,
+  "description": "White-label funeral cover sign-up and subscription platform",
+  "scripts": {
+    "dev": "next dev",
+    "build": "prisma generate && prisma db push --skip-generate && next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "db:seed": "tsx prisma/seed.ts",
+    "test": "tsx --test src/lib/*.test.ts",
+    "postinstall": "prisma generate"
+  },
+  "dependencies": {
+    "@prisma/client": "5.20.0",
+    "bcryptjs": "2.4.3",
+    "jose": "5.9.3",
+    "next": "14.2.15",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "zod": "3.23.8"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "2.4.6",
+    "@types/node": "20.16.11",
+    "@types/react": "18.3.11",
+    "@types/react-dom": "18.3.1",
+    "prisma": "5.20.0",
+    "tsx": "4.19.1",
+    "typescript": "5.6.3"
+  }
+}

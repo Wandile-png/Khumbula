@@ -1,0 +1,331 @@
+// Khumbula — white-label funeral cover platform
+// Money is stored in cents (Int). Dates are stored as UTC midnight for calendar dates.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url       = env("DATABASE_URL")          // pooled connection (app)
+  directUrl = env("DATABASE_URL_UNPOOLED") // direct connection (schema changes on deploy)
+}
+
+enum PaymentMethod {
+  DEBICHECK
+  CARD
+  EFT
+  CASH
+}
+
+enum CardGateway {
+  PAYFAST
+  PAYSTACK
+}
+
+enum PolicyStatus {
+  PENDING   // signed up, first premium not yet received
+  WAITING   // paid, inside waiting period (accidental death covered only)
+  ACTIVE    // fully covered
+  ARREARS   // one premium missed, in grace
+  LAPSED    // two or more consecutive premiums missed
+  CANCELLED
+}
+
+enum PremiumStatus {
+  DUE
+  PAID
+  MISSED
+  WAIVED
+}
+
+enum MandateStatus {
+  REQUESTED
+  APPROVED
+  DECLINED
+  CANCELLED
+}
+
+enum ClaimStatus {
+  LOGGED
+  DOCUMENTS
+  APPROVED
+  DECLINED
+  PAID
+}
+
+enum DeathCause {
+  NATURAL
+  ACCIDENTAL
+}
+
+enum Channel {
+  WHATSAPP
+  SMS
+}
+
+enum MessageStatus {
+  QUEUED
+  SENT
+  FAILED
+  SKIPPED
+}
+
+enum StaffRole {
+  OWNER
+  ADMIN
+  CLAIMS
+  VIEWER
+}
+
+model Tenant {
+  id            String      @id @default(cuid())
+  slug          String      @unique
+  name          String
+  tagline       String      @default("")
+  brandColor    String      @default("#16130F") // primary / dark surfaces
+  accentColor   String      @default("#B08A3E") // highlights
+  phone         String      @default("")
+  whatsapp      String      @default("")
+  email         String      @default("")
+  website       String      @default("")
+  address       String      @default("")
+  underwriter   String      @default("")
+  fspNumber     String      @default("")
+  waitingMonths Int         @default(6)
+  graceDays     Int         @default(7)  // days after due date before a premium counts as missed
+  policyPrefix  String      @default("POL")
+  policySeq     Int         @default(1000)
+  claimSeq      Int         @default(2000)
+  cardGateway   CardGateway @default(PAYFAST)
+  enabledMethods PaymentMethod[] @default([DEBICHECK, CARD, EFT, CASH])
+  createdAt     DateTime    @default(now())
+
+  plans    Plan[]
+  benefits Benefit[]
+  members  Member[]
+  policies Policy[]
+  claims   Claim[]
+  messages Message[]
+  staff    StaffUser[]
+  otps     Otp[]
+  audit    AuditLog[]
+}
+
+model Plan {
+  id           String     @id @default(cuid())
+  tenantId     String
+  tenant       Tenant     @relation(fields: [tenantId], references: [id])
+  code         String
+  name         String
+  description  String     @default("")
+  coversSpouse Boolean    @default(false)
+  maxChildren  Int        @default(0)
+  maxChildAge  Int        @default(21)
+  maxExtended  Int        @default(0)
+  sortOrder    Int        @default(0)
+  active       Boolean    @default(true)
+  tiers        PlanTier[]
+  policies     Policy[]
+
+  @@unique([tenantId, code])
+}
+
+model PlanTier {
+  id           String @id @default(cuid())
+  planId       String
+  plan         Plan   @relation(fields: [planId], references: [id], onDelete: Cascade)
+  minAge       Int
+  maxAge       Int
+  premiumCents Int
+}
+
+model Benefit {
+  id        String @id @default(cuid())
+  tenantId  String
+  tenant    Tenant @relation(fields: [tenantId], references: [id])
+  label     String
+  sortOrder Int    @default(0)
+}
+
+model Member {
+  id          String   @id @default(cuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  firstName   String
+  lastName    String
+  idNumberEnc String   // AES-256-GCM, see src/lib/crypto.ts
+  idHash      String   // HMAC for lookup without decrypting
+  dateOfBirth DateTime
+  phone       String   // E.164, e.g. +27721234567
+  email       String   @default("")
+  address     String   @default("")
+  createdAt   DateTime @default(now())
+  policies    Policy[]
+
+  @@unique([tenantId, idHash])
+}
+
+model Policy {
+  id              String        @id @default(cuid())
+  tenantId        String
+  tenant          Tenant        @relation(fields: [tenantId], references: [id])
+  memberId        String
+  member          Member        @relation(fields: [memberId], references: [id])
+  planId          String
+  plan            Plan          @relation(fields: [planId], references: [id])
+  policyNumber    String        @unique
+  premiumCents    Int
+  status          PolicyStatus  @default(PENDING)
+  debitDay        Int           // 1–31; clamps to month end
+  paymentMethod   PaymentMethod
+  startDate       DateTime      // first premium due date
+  firstPaidAt     DateTime?
+  waitingEndsAt   DateTime?
+  consentAt       DateTime
+  cancelledAt     DateTime?
+  // gateway references
+  payfastToken    String?       // PayFast subscription token
+  paystackAuthCode String?      // Paystack reusable card authorization
+  paystackEmail   String?
+  createdAt       DateTime      @default(now())
+
+  dependants   Dependant[]
+  beneficiary  Beneficiary?
+  premiums     Premium[]
+  mandate      Mandate?
+  claims       Claim[]
+  messages     Message[]
+
+  @@index([tenantId, status])
+}
+
+model Dependant {
+  id          String    @id @default(cuid())
+  policyId    String
+  policy      Policy    @relation(fields: [policyId], references: [id], onDelete: Cascade)
+  name        String
+  relation    String    // Spouse, Child, Mother, Brother, ...
+  kind        String    // SPOUSE | CHILD | EXTENDED
+  dateOfBirth DateTime?
+  idNumberEnc String?
+}
+
+model Beneficiary {
+  id       String @id @default(cuid())
+  policyId String @unique
+  policy   Policy @relation(fields: [policyId], references: [id], onDelete: Cascade)
+  name     String
+  relation String
+  phone    String
+}
+
+model Premium {
+  id          String        @id @default(cuid())
+  policyId    String
+  policy      Policy        @relation(fields: [policyId], references: [id], onDelete: Cascade)
+  dueDate     DateTime
+  amountCents Int
+  status      PremiumStatus @default(DUE)
+  paidAt      DateTime?
+  method      PaymentMethod?
+  gatewayRef  String?
+  attempts    Int           @default(0)
+  lastError   String?
+  createdAt   DateTime      @default(now())
+
+  @@unique([policyId, dueDate])
+  @@index([status, dueDate])
+}
+
+model Mandate {
+  id           String        @id @default(cuid())
+  policyId     String        @unique
+  policy       Policy        @relation(fields: [policyId], references: [id], onDelete: Cascade)
+  provider     String        @default("NETCASH")
+  bank         String
+  accountType  String
+  accountLast4 String        // full account number is sent to the provider and never stored
+  status       MandateStatus @default(REQUESTED)
+  providerRef  String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+}
+
+model Claim {
+  id          String        @id @default(cuid())
+  tenantId    String
+  tenant      Tenant        @relation(fields: [tenantId], references: [id])
+  policyId    String
+  policy      Policy        @relation(fields: [policyId], references: [id])
+  number      String        @unique
+  deceased    String
+  relation    String
+  dateOfDeath DateTime
+  cause       DeathCause
+  status      ClaimStatus   @default(LOGGED)
+  notes       String        @default("")
+  docDha1663  Boolean       @default(false) // notification of death
+  docDeathCert Boolean      @default(false) // abridged death certificate
+  docIds      Boolean       @default(false) // certified IDs of deceased and claimant
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
+model Message {
+  id          String        @id @default(cuid())
+  tenantId    String
+  tenant      Tenant        @relation(fields: [tenantId], references: [id])
+  policyId    String?
+  policy      Policy?       @relation(fields: [policyId], references: [id])
+  channel     Channel
+  template    String
+  to          String
+  body        String
+  status      MessageStatus @default(QUEUED)
+  dedupeKey   String        @unique
+  providerRef String?
+  error       String?
+  sentAt      DateTime?
+  createdAt   DateTime      @default(now())
+
+  @@index([status])
+}
+
+model StaffUser {
+  id           String    @id @default(cuid())
+  tenantId     String
+  tenant       Tenant    @relation(fields: [tenantId], references: [id])
+  email        String
+  name         String
+  passwordHash String
+  role         StaffRole @default(ADMIN)
+  createdAt    DateTime  @default(now())
+
+  @@unique([tenantId, email])
+}
+
+model Otp {
+  id        String   @id @default(cuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  memberId  String
+  codeHash  String
+  expiresAt DateTime
+  attempts  Int      @default(0)
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  actor     String   // staff email, "member:<policy>", "system", "webhook:payfast"
+  action    String
+  target    String   @default("")
+  detail    Json?
+  createdAt DateTime @default(now())
+
+  @@index([tenantId, createdAt])
+}
