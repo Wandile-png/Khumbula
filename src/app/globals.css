@@ -4,6 +4,9 @@
   --brand: #16130F; --accent: #B08A3E; --onbrand: #F3EAD6;
   --ok: #2E7D4F; --warn: #B26B00; --bad: #B23A3A; --info: #2F5F8F;
   --radius: 12px;
+  --font-caps: "Cinzel", "Trajan Pro", Georgia;
+  --font-display: "Playfair Display", Georgia;
+  --font-body: "Figtree", system-ui, -apple-system, "Segoe UI";
 }
 @media (prefers-color-scheme: dark) {
   :root { --bg: #0E0D0B; --surface: #181612; --sunk: #221F1A; --ink: #F1E9D8; --muted: #A79C88; --line: #332E25;
