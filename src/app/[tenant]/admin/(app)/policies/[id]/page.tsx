@@ -6,6 +6,8 @@ import { formatDate, ordinal } from "@/lib/dates";
 import { displayPhone } from "@/lib/phone";
 import { maskId, decrypt } from "@/lib/crypto";
 import { cancelPolicy, recordCashPayment, setMandate } from "../../../actions";
+import { listDocuments } from "@/lib/documents";
+import { IdUploadForm } from "@/components/IdUploadForm";
 
 const OK: Record<string, string> = { paid: "Payment recorded.", mandate: "Mandate updated.", cancelled: "Policy cancelled." };
 
@@ -16,6 +18,7 @@ export default async function PolicyDetail({ params, searchParams }: { params: {
     include: { member: true, plan: true, dependants: true, beneficiary: true, mandate: true, premiums: { orderBy: { dueDate: "desc" } }, claims: true, messages: { orderBy: { createdAt: "desc" }, take: 10 } },
   });
   if (!p) notFound();
+  const docs = await listDocuments(p.memberId);
   const open = p.premiums.filter((x) => x.status === "DUE" || x.status === "MISSED");
   return (
     <div className="stack">
@@ -55,6 +58,17 @@ export default async function PolicyDetail({ params, searchParams }: { params: {
           </div>
         </div>
         <div className="stack" style={{ minWidth: 0 }}>
+          <div className="panel stack-s">
+            <div className="row between"><h3>ID document</h3>{docs.length ? <span className="chip s-ACTIVE">On file</span> : <span className="chip s-ARREARS">Missing</span>}</div>
+            {docs.map((d) => (
+              <div key={d.id} className="row between small">
+                <span>{d.mime === "application/pdf" ? "PDF" : "Photo"} · {Math.max(1, Math.round(d.size / 1024))} KB · {formatDate(d.createdAt)}<div className="muted">by {d.uploadedBy.startsWith("member:") ? "member" : d.uploadedBy}</div></span>
+                <a className="btn ghost sm" href={`/api/${t.slug}/documents/${d.id}`} target="_blank" rel="noreferrer">View</a>
+              </div>
+            ))}
+            <IdUploadForm slug={t.slug} policyId={p.id} label={docs.length ? "Replace with a clearer copy" : "Upload the member's ID"} />
+            <p className="muted small">Each time staff view an ID it is recorded in the audit log.</p>
+          </div>
           {open.length > 0 && (
             <form action={recordCashPayment.bind(null, t.slug)} className="panel stack">
               <h3>Record a payment</h3>

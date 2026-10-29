@@ -7,6 +7,7 @@ import { signLink } from "@/lib/auth";
 import { requestMandate, BANKS } from "@/lib/payments/netcash";
 import { decrypt } from "@/lib/crypto";
 import { rateLimit } from "@/lib/ratelimit";
+import { parseUpload, saveDocument } from "@/lib/documents";
 
 const phone = z.string().transform((v, ctx) => {
   const e = toE164(v);
@@ -30,6 +31,7 @@ const Body = z.object({
   debitDay: z.number().int().min(1).max(31),
   bank: z.object({ bank: z.string().refine((b) => b in BANKS, "Choose a bank from the list."), accountType: z.enum(["Savings", "Cheque", "Transmission"]), accountNumber: z.string().regex(/^\d{7,12}$/, "Account numbers are 7 to 12 digits.") }).nullable().optional(),
   consent: z.literal(true, { errorMap: () => ({ message: "Accept the terms to continue." }) }),
+  idDocument: z.object({ name: z.string().max(200), mime: z.string().max(60), data: z.string().max(4_500_000) }).nullable().optional(),
 });
 
 export async function POST(req: Request, { params }: { params: { tenant: string } }) {
@@ -43,9 +45,12 @@ export async function POST(req: Request, { params }: { params: { tenant: string 
   if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Check your details." }, { status: 400 });
   const b = parsed.data;
   if (b.method === "DEBICHECK" && !b.bank) return NextResponse.json({ error: "Add your bank details for the debit order." }, { status: 400 });
+  const idFile = parseUpload(b.idDocument);
+  if (!idFile.ok) return NextResponse.json({ error: idFile.error }, { status: 400 });
 
   try {
     const policy = await createPolicy(tenant.id, { ...b, spouse: b.spouse ?? null, bank: b.bank ?? null, beneficiary: { ...b.beneficiary, relation: b.beneficiary.relation } });
+    await saveDocument({ tenantId: tenant.id, memberId: policy.memberId, file: idFile, actor: `member:${policy.policyNumber}` });
 
     if (b.method === "DEBICHECK" && b.bank) {
       const full = await db.policy.findUniqueOrThrow({ where: { id: policy.id }, include: { member: true } });

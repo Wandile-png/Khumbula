@@ -6,6 +6,8 @@ import { Footer, Masthead } from "@/components/Masthead";
 import { formatRand } from "@/lib/money";
 import { formatDate, isoDate, nextDebitOnOrAfter, ordinal, todaySA } from "@/lib/dates";
 import { logClaim, logout } from "./actions";
+import { listDocuments } from "@/lib/documents";
+import { IdUploadForm } from "@/components/IdUploadForm";
 
 const STATUS_TEXT: Record<string, string> = { PENDING: "Awaiting first premium", WAITING: "Waiting period", ACTIVE: "Covered", ARREARS: "In arrears", LAPSED: "Lapsed", CANCELLED: "Cancelled" };
 const METHOD_TEXT: Record<string, string> = { DEBICHECK: "Debit order", CARD: "Card", EFT: "Instant EFT", CASH: "Cash" };
@@ -20,6 +22,7 @@ export default async function Portal({ params, searchParams }: { params: { tenan
     orderBy: { createdAt: "desc" },
   });
   const today = todaySA();
+  const docs = await listDocuments(member.id);
 
   return (
     <>
@@ -65,6 +68,12 @@ export default async function Portal({ params, searchParams }: { params: { tenan
                   <h3>People covered</h3>
                   <div className="summary">{people.map((x) => { const [n, r] = x.split("|"); return <div key={x}><span>{n}</span><span className="muted" style={{ fontWeight: 400 }}>{r}</span></div>; })}</div>
                   {p.beneficiary && <><hr /><div className="summary"><div><span className="muted">Beneficiary</span><span>{p.beneficiary.name}{p.beneficiary.relation ? ` (${p.beneficiary.relation})` : ""}</span></div></div></>}
+                  <hr />
+                  {docs.length ? (
+                    <div className="row between small"><span className="muted">ID document</span><span><span className="chip s-ACTIVE">Received {formatDate(docs[0].createdAt)}</span> <a href={`/api/${t.slug}/documents/${docs[0].id}`} target="_blank" rel="noreferrer">View</a></span></div>
+                  ) : (
+                    <IdUploadForm slug={t.slug} policyId={p.id} label="We still need a copy of your ID" />
+                  )}
                 </div>
 
                 <div className="panel stack">

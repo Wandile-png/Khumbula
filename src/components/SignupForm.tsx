@@ -6,6 +6,7 @@ import { premiumForAge } from "@/lib/rules";
 import { formatRand } from "@/lib/money";
 import { addMonths, firstDebitAfter, formatDate, ordinal, todaySA } from "@/lib/dates";
 import { PlanTable } from "./PlanTable";
+import { IdDocumentInput, type PickedFile } from "./IdDocumentInput";
 
 type Tier = { id: string; minAge: number; maxAge: number; premiumCents: number };
 type Plan = { code: string; name: string; description: string; coversSpouse: boolean; maxChildren: number; maxChildAge: number; maxExtended: number; tiers: Tier[] };
@@ -38,6 +39,7 @@ export function SignupForm({ tenant, plans, initialPlan, banks }: Props) {
   const [bank, setBank] = useState({ bank: banks[0] ?? "", accountType: "Savings", accountNumber: "" });
   const [debitDay, setDebitDay] = useState(1);
   const [consent, setConsent] = useState(false);
+  const [idDoc, setIdDoc] = useState<PickedFile | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
 
@@ -58,6 +60,7 @@ export function SignupForm({ tenant, plans, initialPlan, banks }: Props) {
       else if (premium == null) e.idNumber = `Age ${age} is outside this plan's entry ages. Go back and choose another plan.`;
       if (!/^0[6-8]\d{8}$/.test(me.phone.replace(/\s/g, ""))) e.phone = "Enter a 10-digit SA cellphone number starting with 06, 07 or 08.";
       if (me.email && !/^\S+@\S+\.\S+$/.test(me.email)) e.email = "Check the email address.";
+      if (!idDoc) e.idDoc = "Add a photo or scan of your ID document.";
     }
     if (step === 2) {
       if (spouse.name && !parseSaId(spouse.idNumber).ok) e.spouse = "Spouse ID: " + (parseSaId(spouse.idNumber) as { error: string }).error;
@@ -89,6 +92,7 @@ export function SignupForm({ tenant, plans, initialPlan, banks }: Props) {
           debitDay,
           bank: method === "DEBICHECK" ? { ...bank, accountNumber: bank.accountNumber.replace(/\s/g, "") } : null,
           consent,
+          idDocument: idDoc ? { name: idDoc.name, mime: idDoc.mime, data: idDoc.data } : null,
         }),
       });
       const json = await res.json();
@@ -147,6 +151,7 @@ export function SignupForm({ tenant, plans, initialPlan, banks }: Props) {
             <input id="idNumber" type="text" inputMode="numeric" maxLength={13} className="mono" value={me.idNumber} onChange={(e) => setMe({ ...me, idNumber: e.target.value.replace(/\D/g, "") })} />
             {errors.idNumber ? err("idNumber") : id && (id.ok ? (premium != null ? <span className="ok">Age {age} · premium {formatRand(premium)} per month</span> : <span className="err">Age {age} is outside this plan's entry ages.</span>) : <span className="err">{id.error}</span>)}
           </label>
+          <IdDocumentInput value={idDoc} onChange={(f) => { setIdDoc(f); setErrors((x) => ({ ...x, idDoc: "" })); }} error={errors.idDoc} />
           <div className="grid2">
             <label className="f">Cellphone<input id="phone" type="tel" autoComplete="tel" value={me.phone} onChange={(e) => setMe({ ...me, phone: e.target.value })} />{err("phone")}</label>
             <label className="f">Email <span className="hint">Optional</span><input id="email" type="email" autoComplete="email" value={me.email} onChange={(e) => setMe({ ...me, email: e.target.value })} />{err("email")}</label>
@@ -241,6 +246,7 @@ export function SignupForm({ tenant, plans, initialPlan, banks }: Props) {
             <div><span className="muted">Main member</span><span>{me.firstName} {me.lastName}, {age}</span></div>
             <div><span className="muted">People covered</span><span>{peopleCovered}</span></div>
             <div><span className="muted">Beneficiary</span><span>{ben.name}</span></div>
+            <div><span className="muted">ID document</span><span>{idDoc ? "Attached" : "Missing"}</span></div>
             <hr />
             <div><span className="muted">Monthly premium</span><span>{formatRand(premium)}</span></div>
             <div><span className="muted">Paid by</span><span>{METHOD_TEXT[method][0]}{method === "DEBICHECK" ? ` · ${bank.bank} ••${bank.accountNumber.slice(-4)}` : ""}</span></div>
