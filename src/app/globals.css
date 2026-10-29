@@ -92,6 +92,8 @@ input[type=text], input[type=tel], input[type=email], input[type=number], input[
 .btn:hover { filter: brightness(1.15); }
 .btn.primary { background: var(--accent); color: #16130F; font-size: 16px; padding: 13px 22px; min-width: 150px; box-shadow: 0 2px 0 color-mix(in srgb, var(--accent) 55%, #000); }
 .btn.primary:disabled { box-shadow: none; }
+.btn.primary.notready { background: var(--sunk); color: var(--muted); box-shadow: none; border: 1px solid var(--line); }
+.btn.primary.notready:hover { filter: none; }
 .actionbar { position: sticky; bottom: 0; z-index: 4; margin-inline: -16px; padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); background: color-mix(in srgb, var(--surface) 94%, transparent); backdrop-filter: blur(6px); border-top: 1px solid var(--line); box-shadow: 0 -6px 18px rgba(0,0,0,.06); }
 .actionbar-in { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .pickedsum { display: flex; flex-direction: column; line-height: 1.2; min-width: 0; }

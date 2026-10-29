@@ -53,7 +53,8 @@ export function SignupForm({ tenant, plans, initialPlan, initialAgent, banks }: 
   const premium = age != null ? premiumForAge(p.tiers, age) : null;
   const firstDebit = firstDebitAfter(today, debitDay);
 
-  function validate(): boolean {
+  /** Problems on the current step. Used to grey out Continue and, when tapped, to show what's missing. */
+  function check(): Record<string, string> {
     const e: Record<string, string> = {};
     if (step === 1) {
       if (!me.firstName.trim()) e.firstName = "Enter your first name.";
@@ -73,9 +74,17 @@ export function SignupForm({ tenant, plans, initialPlan, initialAgent, banks }: 
     }
     if (step === 3 && method === "DEBICHECK" && !/^\d{7,12}$/.test(bank.accountNumber.replace(/\s/g, ""))) e.account = "Account numbers are 7 to 12 digits.";
     if (step === 4 && !consent) e.consent = "Tick the box to accept the terms.";
+    return e;
+  }
+
+  function validate(): boolean {
+    const e = check();
     setErrors(e);
     return !Object.keys(e).length;
   }
+
+  const missing = Object.keys(check()).length;
+  const ready = missing === 0;
 
   async function submit() {
     setBusy(true);
@@ -278,14 +287,24 @@ export function SignupForm({ tenant, plans, initialPlan, initialAgent, banks }: 
       <div className="actionbar">
         <div className="actionbar-in">
           {step > 0 ? (
-            <button type="button" className="btn ghost" onClick={() => { setErrors({}); setStep(step - 1); window.scrollTo(0, 0); }}>Back</button>
+            <span className="row" style={{ gap: 10 }}>
+              <button type="button" className="btn ghost" onClick={() => { setErrors({}); setStep(step - 1); window.scrollTo(0, 0); }}>Back</button>
+              {!ready && <span className="muted small">{missing} left to fill in</span>}
+            </span>
           ) : (
             <span className="pickedsum">
               <span className="muted small">Your plan</span>
               <b>{p.name}</b>
             </span>
           )}
-          <button type="button" className="btn primary" onClick={next} disabled={busy}>
+          <button
+            type="button"
+            className={`btn primary${ready ? "" : " notready"}`}
+            aria-disabled={!ready}
+            title={ready ? undefined : "Fill in the required details first"}
+            onClick={next}
+            disabled={busy}
+          >
             {busy ? "Activating…" : step === 4 ? "Activate my policy" : "Continue →"}
           </button>
         </div>
