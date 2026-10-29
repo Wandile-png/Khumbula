@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { getTenant } from "@/lib/tenant";
 import { requireStaff } from "@/lib/auth";
 import { Masthead } from "@/components/Masthead";
@@ -7,6 +8,7 @@ import { staffLogout } from "../actions";
 export default async function AdminLayout({ children, params }: { children: React.ReactNode; params: { tenant: string } }) {
   const t = await getTenant(params.tenant);
   const s = await requireStaff(t.id, t.slug);
+  if (s.role === "AGENT") redirect(`/${t.slug}/agent`);
   return (
     <>
       <Masthead tenant={t} />

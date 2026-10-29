@@ -13,6 +13,10 @@ export async function GET(_req: Request, { params }: { params: { tenant: string;
   const staff = await getStaff(tenant.id);
   const member = staff ? null : await getMember(tenant.id);
   if (!staff && (!member || member.memberId !== doc.memberId)) return new Response("Sign in to view this document.", { status: 401 });
+  if (staff && staff.role === "AGENT") {
+    const own = await db.policy.count({ where: { memberId: doc.memberId, agentId: staff.staffId } });
+    if (!own) return new Response("You can only view documents for your own clients.", { status: 403 });
+  }
   if (staff) await audit(tenant.id, staff.email, "document.viewed", doc.id);
 
   const bytes = decryptBytes(doc.dataEnc);

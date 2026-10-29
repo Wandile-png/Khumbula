@@ -3,7 +3,7 @@ import { Footer, Masthead } from "@/components/Masthead";
 import { SignupForm } from "@/components/SignupForm";
 import { BANKS } from "@/lib/payments/netcash";
 
-export default async function Join({ params, searchParams }: { params: { tenant: string }; searchParams: { plan?: string } }) {
+export default async function Join({ params, searchParams }: { params: { tenant: string }; searchParams: { plan?: string; agent?: string } }) {
   const t = await getTenant(params.tenant);
   const plans = t.plans.map((p) => ({
     code: p.code, name: p.name, description: p.description, coversSpouse: p.coversSpouse, maxChildren: p.maxChildren,
@@ -17,6 +17,7 @@ export default async function Join({ params, searchParams }: { params: { tenant:
           tenant={{ slug: t.slug, name: t.name, waitingMonths: t.waitingMonths, underwriter: t.underwriter, methods: t.enabledMethods, cardGateway: t.cardGateway }}
           plans={plans}
           initialPlan={searchParams.plan}
+          initialAgent={searchParams.agent}
           banks={Object.keys(BANKS)}
         />
       </main>

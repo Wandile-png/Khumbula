@@ -17,7 +17,7 @@ export default async function Policies({ params, searchParams }: { params: { ten
     ...(status ? { status } : {}),
     ...(q ? { OR: [{ policyNumber: { contains: q, mode: "insensitive" } }, { member: { lastName: { contains: q, mode: "insensitive" } } }, { member: { firstName: { contains: q, mode: "insensitive" } } }, { member: { phone: { contains: q.replace(/^0/, "") } } }] } : {}),
   };
-  const policies = await db.policy.findMany({ where, include: { member: { include: { _count: { select: { documents: true } } } }, plan: true, _count: { select: { dependants: true } } }, orderBy: { createdAt: "desc" }, take: 200 });
+  const policies = await db.policy.findMany({ where, include: { member: { include: { _count: { select: { documents: true } } } }, plan: true, agent: { select: { agentCode: true } }, _count: { select: { dependants: true } } }, orderBy: { createdAt: "desc" }, take: 200 });
   const href = (s?: string) => `/${t.slug}/admin/policies${s ? `?status=${s}` : ""}`;
   return (
     <div className="stack">
@@ -40,7 +40,7 @@ export default async function Policies({ params, searchParams }: { params: { ten
             <tr key={p.id}>
               <td className="mono"><Link href={`/${t.slug}/admin/policies/${p.id}`}>{p.policyNumber}</Link></td>
               <td>{p.member.firstName} {p.member.lastName}<div className="muted small">{displayPhone(p.member.phone)} · {1 + p._count.dependants} covered{p.member._count.documents ? "" : " · "}{!p.member._count.documents && <span style={{ color: "var(--warn)" }}>no ID</span>}</div></td>
-              <td>{p.plan.name}</td>
+              <td>{p.plan.name}{p.agent && <div className="muted small mono">{p.agent.agentCode}</div>}</td>
               <td>{p.paymentMethod.toLowerCase()}<div className="muted small">{ordinal(p.debitDay)}</div></td>
               <td className="r">{formatRand(p.premiumCents)}</td>
               <td><span className={`chip s-${p.status}`}>{p.status.toLowerCase()}</span>{p.status === "WAITING" && p.waitingEndsAt && <div className="muted small">until {formatDate(p.waitingEndsAt)}</div>}</td>

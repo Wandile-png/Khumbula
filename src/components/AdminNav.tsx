@@ -4,7 +4,7 @@ import { usePathname } from "next/navigation";
 
 export function AdminNav({ slug }: { slug: string }) {
   const path = usePathname();
-  const items = [["", "Dashboard"], ["/policies", "Policies"], ["/claims", "Claims"], ["/messages", "Messages"], ["/settings", "Settings"]];
+  const items = [["", "Dashboard"], ["/policies", "Policies"], ["/claims", "Claims"], ["/agents", "Agents"], ["/messages", "Messages"], ["/settings", "Settings"]];
   return (
     <nav className="adminnav" aria-label="Admin">
       {items.map(([p, label]) => {

@@ -15,7 +15,7 @@ export default async function PolicyDetail({ params, searchParams }: { params: {
   const t = await getTenant(params.tenant);
   const p = await db.policy.findFirst({
     where: { id: params.id, tenantId: t.id },
-    include: { member: true, plan: true, dependants: true, beneficiary: true, mandate: true, premiums: { orderBy: { dueDate: "desc" } }, claims: true, messages: { orderBy: { createdAt: "desc" }, take: 10 } },
+    include: { member: true, plan: true, agent: { select: { name: true, agentCode: true } }, dependants: true, beneficiary: true, mandate: true, premiums: { orderBy: { dueDate: "desc" } }, claims: true, messages: { orderBy: { createdAt: "desc" }, take: 10 } },
   });
   if (!p) notFound();
   const docs = await listDocuments(p.memberId);
@@ -39,6 +39,7 @@ export default async function PolicyDetail({ params, searchParams }: { params: {
             <div><span className="muted">ID number</span><span className="mono">{maskId(decrypt(p.member.idNumberEnc))}</span></div>
             <div><span className="muted">Cellphone</span><span>{displayPhone(p.member.phone)}</span></div>
             {p.member.email && <div><span className="muted">Email</span><span>{p.member.email}</span></div>}
+            <div><span className="muted">Sold by</span><span>{p.agent ? `${p.agent.name} (${p.agent.agentCode})` : "Online, no agent"}</span></div>
             <div><span className="muted">Consent recorded</span><span>{formatDate(p.consentAt)}</span></div>
           </div>
           <div className="panel stack">

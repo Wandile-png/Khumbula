@@ -23,6 +23,7 @@ export type SignupInput = {
   method: PaymentMethod;
   debitDay: number;
   bank?: { bank: string; accountType: string; accountNumber: string } | null;
+  agentId?: string | null;
 };
 
 export class SignupError extends Error {}
@@ -90,6 +91,7 @@ export async function createPolicy(tenantId: string, input: SignupInput) {
         paymentMethod: input.method,
         startDate,
         consentAt: new Date(),
+        agentId: input.agentId ?? null,
         dependants: { create: dependants },
         beneficiary: { create: input.beneficiary },
         premiums: { create: { dueDate: startDate, amountCents: premium } },

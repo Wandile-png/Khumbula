@@ -9,7 +9,7 @@ export default async function AdminLogin({ params, searchParams }: { params: { t
       <Masthead tenant={t} />
       <main className="page wrap">
         <form action={staffLogin.bind(null, t.slug)} className="narrow stack" style={{ maxWidth: 420 }}>
-          <div className="stack-s"><span className="eyebrow">Staff</span><h1>Admin sign in</h1></div>
+          <div className="stack-s"><span className="eyebrow">Staff and agents</span><h1>Sign in</h1></div>
           {searchParams.created && <p className="flash">{t.name} is set up. Sign in with the admin email and password you just chose.</p>}
           {searchParams.e === "bad" && <p className="flash bad">That email and password don't match.</p>}
           {searchParams.e === "rate" && <p className="flash bad">Too many attempts. Wait 15 minutes.</p>}

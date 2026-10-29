@@ -15,6 +15,7 @@ type Props = {
   tenant: { slug: string; name: string; waitingMonths: number; underwriter: string; methods: Method[]; cardGateway: string };
   plans: Plan[];
   initialPlan?: string;
+  initialAgent?: string;
   banks: string[];
 };
 
@@ -27,7 +28,7 @@ const METHOD_TEXT: Record<Method, [string, string]> = {
 };
 const DAYS = [1, 15, 20, 25, 26, 28];
 
-export function SignupForm({ tenant, plans, initialPlan, banks }: Props) {
+export function SignupForm({ tenant, plans, initialPlan, initialAgent, banks }: Props) {
   const [step, setStep] = useState(0);
   const [plan, setPlan] = useState(initialPlan && plans.some((p) => p.code === initialPlan) ? initialPlan : plans[0]?.code);
   const [me, setMe] = useState({ firstName: "", lastName: "", idNumber: "", phone: "", email: "", address: "" });
@@ -40,6 +41,8 @@ export function SignupForm({ tenant, plans, initialPlan, banks }: Props) {
   const [debitDay, setDebitDay] = useState(1);
   const [consent, setConsent] = useState(false);
   const [idDoc, setIdDoc] = useState<PickedFile | null>(null);
+  const [agentCode, setAgentCode] = useState((initialAgent ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 20));
+  const agentLocked = !!initialAgent;
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
 
@@ -92,6 +95,7 @@ export function SignupForm({ tenant, plans, initialPlan, banks }: Props) {
           debitDay,
           bank: method === "DEBICHECK" ? { ...bank, accountNumber: bank.accountNumber.replace(/\s/g, "") } : null,
           consent,
+          agentCode,
           idDocument: idDoc ? { name: idDoc.name, mime: idDoc.mime, data: idDoc.data } : null,
         }),
       });
@@ -231,6 +235,9 @@ export function SignupForm({ tenant, plans, initialPlan, banks }: Props) {
               <label className="f">Account number<input id="accountNumber" type="text" inputMode="numeric" className="mono" value={bank.accountNumber} onChange={(e) => setBank({ ...bank, accountNumber: e.target.value })} />{err("account")}</label>
             </div>
           )}
+          <label className="f">Agent code <span className="hint">{agentLocked ? "Your agent's code is filled in." : "Optional. If an agent helped you, enter their code so they get the credit."}</span>
+            <input id="agentCode" type="text" className="mono" value={agentCode} readOnly={agentLocked} placeholder="e.g. AG101" onChange={(e) => setAgentCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 20))} />
+          </label>
           <label className="f">Premium day <span className="hint">Match it to your payday.</span>
             <select id="debitDay" value={debitDay} onChange={(e) => setDebitDay(Number(e.target.value))}>
               {DAYS.map((d) => <option key={d} value={d}>{ordinal(d)} of each month</option>)}
@@ -246,6 +253,7 @@ export function SignupForm({ tenant, plans, initialPlan, banks }: Props) {
             <div><span className="muted">Main member</span><span>{me.firstName} {me.lastName}, {age}</span></div>
             <div><span className="muted">People covered</span><span>{peopleCovered}</span></div>
             <div><span className="muted">Beneficiary</span><span>{ben.name}</span></div>
+            {agentCode && <div><span className="muted">Agent</span><span className="mono">{agentCode}</span></div>}
             <div><span className="muted">ID document</span><span>{idDoc ? "Attached" : "Missing"}</span></div>
             <hr />
             <div><span className="muted">Monthly premium</span><span>{formatRand(premium)}</span></div>

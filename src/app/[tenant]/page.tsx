@@ -3,8 +3,9 @@ import { getTenant } from "@/lib/tenant";
 import { Footer, Masthead } from "@/components/Masthead";
 import { PlanTable } from "@/components/PlanTable";
 
-export default async function TenantHome({ params }: { params: { tenant: string } }) {
+export default async function TenantHome({ params, searchParams }: { params: { tenant: string }; searchParams: { agent?: string } }) {
   const t = await getTenant(params.tenant);
+  const ag = searchParams.agent ? `agent=${encodeURIComponent(searchParams.agent)}` : "";
   return (
     <>
       <Masthead tenant={t} active="join" />
@@ -15,13 +16,13 @@ export default async function TenantHome({ params }: { params: { tenant: string 
             <p className="tag">{t.tagline}</p>
             <p className="small" style={{ opacity: 0.8 }}>Choose a plan, add your family and pay by debit order, card, EFT or cash. It takes about five minutes.</p>
             <div className="row" style={{ marginTop: 6 }}>
-              <Link className="btn" href={`/${t.slug}/join`} style={{ background: "var(--accent)", color: "#16130F" }}>Get cover now</Link>
+              <Link className="btn" href={`/${t.slug}/join${ag ? `?${ag}` : ""}`} style={{ background: "var(--accent)", color: "#16130F" }}>Get cover now</Link>
               <Link className="btn ghost" href={`/${t.slug}/portal`} style={{ color: "var(--onbrand)", borderColor: "color-mix(in srgb, var(--onbrand) 30%, transparent)" }}>I'm already a member</Link>
             </div>
           </div>
           <h2 style={{ fontStyle: "italic", fontSize: 26 }}>Our Basic Funeral Plans</h2>
           {t.plans.map((p) => (
-            <Link key={p.id} href={`/${t.slug}/join?plan=${p.code}`} className="plan" style={{ textDecoration: "none" }}>
+            <Link key={p.id} href={`/${t.slug}/join?plan=${p.code}${ag ? `&${ag}` : ""}`} className="plan" style={{ textDecoration: "none" }}>
               <PlanTable plan={p} />
             </Link>
           ))}

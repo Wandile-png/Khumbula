@@ -24,6 +24,7 @@ export async function POST(req: Request, { params }: { params: { tenant: string 
   const member = staff ? null : await getMember(tenant.id);
   if (!staff && (!member || member.memberId !== policy.memberId)) return NextResponse.json({ error: "Sign in again to upload." }, { status: 401 });
   if (staff && staff.role === "VIEWER") return NextResponse.json({ error: "Your role can't upload documents." }, { status: 403 });
+  if (staff && staff.role === "AGENT" && policy.agentId !== staff.staffId) return NextResponse.json({ error: "You can only upload for your own clients." }, { status: 403 });
 
   const who = staff ? staff.email : `member:${policy.policyNumber}`;
   if (!rateLimit(`upload:${who}`, 20, 60 * 60_000)) return NextResponse.json({ error: "Too many uploads. Try again later." }, { status: 429 });

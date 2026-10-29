@@ -31,6 +31,7 @@ const Body = z.object({
   debitDay: z.number().int().min(1).max(31),
   bank: z.object({ bank: z.string().refine((b) => b in BANKS, "Choose a bank from the list."), accountType: z.enum(["Savings", "Cheque", "Transmission"]), accountNumber: z.string().regex(/^\d{7,12}$/, "Account numbers are 7 to 12 digits.") }).nullable().optional(),
   consent: z.literal(true, { errorMap: () => ({ message: "Accept the terms to continue." }) }),
+  agentCode: z.string().trim().max(20).optional().default(""),
   idDocument: z.object({ name: z.string().max(200), mime: z.string().max(60), data: z.string().max(4_500_000) }).nullable().optional(),
 });
 
@@ -45,11 +46,17 @@ export async function POST(req: Request, { params }: { params: { tenant: string 
   if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Check your details." }, { status: 400 });
   const b = parsed.data;
   if (b.method === "DEBICHECK" && !b.bank) return NextResponse.json({ error: "Add your bank details for the debit order." }, { status: 400 });
+  let agentId: string | null = null;
+  if (b.agentCode) {
+    const agent = await db.staffUser.findFirst({ where: { tenantId: tenant.id, agentCode: b.agentCode.toUpperCase(), role: "AGENT", active: true } });
+    if (!agent) return NextResponse.json({ error: "We don't recognise that agent code. Check it with your agent or leave it blank." }, { status: 400 });
+    agentId = agent.id;
+  }
   const idFile = parseUpload(b.idDocument);
   if (!idFile.ok) return NextResponse.json({ error: idFile.error }, { status: 400 });
 
   try {
-    const policy = await createPolicy(tenant.id, { ...b, spouse: b.spouse ?? null, bank: b.bank ?? null, beneficiary: { ...b.beneficiary, relation: b.beneficiary.relation } });
+    const policy = await createPolicy(tenant.id, { ...b, spouse: b.spouse ?? null, bank: b.bank ?? null, agentId, beneficiary: { ...b.beneficiary, relation: b.beneficiary.relation } });
     await saveDocument({ tenantId: tenant.id, memberId: policy.memberId, file: idFile, actor: `member:${policy.policyNumber}` });
 
     if (b.method === "DEBICHECK" && b.bank) {

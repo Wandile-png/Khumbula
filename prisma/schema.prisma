@@ -76,6 +76,7 @@ enum StaffRole {
   ADMIN
   CLAIMS
   VIEWER
+  AGENT   // sales agent: sees only their own clients
 }
 
 model Tenant {
@@ -97,6 +98,7 @@ model Tenant {
   policyPrefix  String      @default("POL")
   policySeq     Int         @default(1000)
   claimSeq      Int         @default(2000)
+  agentSeq      Int         @default(100)
   cardGateway   CardGateway @default(PAYFAST)
   enabledMethods PaymentMethod[] @default([DEBICHECK, CARD, EFT, CASH])
   createdAt     DateTime    @default(now())
@@ -198,6 +200,8 @@ model Policy {
   mandate      Mandate?
   claims       Claim[]
   messages     Message[]
+  agentId      String?
+  agent        StaffUser?    @relation("SoldBy", fields: [agentId], references: [id])
 
   @@index([tenantId, status])
 }
@@ -302,9 +306,14 @@ model StaffUser {
   name         String
   passwordHash String
   role         StaffRole @default(ADMIN)
+  agentCode    String?   // e.g. AG101, only for agents
+  phone        String    @default("")
+  active       Boolean   @default(true)
   createdAt    DateTime  @default(now())
+  sold         Policy[]  @relation("SoldBy")
 
   @@unique([tenantId, email])
+  @@unique([tenantId, agentCode])
 }
 
 model Otp {

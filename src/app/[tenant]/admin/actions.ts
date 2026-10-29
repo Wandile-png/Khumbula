@@ -20,10 +20,10 @@ export async function staffLogin(slug: string, form: FormData) {
   const password = String(form.get("password") ?? "");
   if (!rateLimit(`staff:${email}`, 8, 15 * 60_000)) redirect(`/${slug}/admin/login?e=rate`);
   const u = await db.staffUser.findUnique({ where: { tenantId_email: { tenantId: t.id, email } } });
-  if (!u || !(await bcrypt.compare(password, u.passwordHash))) redirect(`/${slug}/admin/login?e=bad`);
+  if (!u || !u.active || !(await bcrypt.compare(password, u.passwordHash))) redirect(`/${slug}/admin/login?e=bad`);
   await startStaffSession({ staffId: u.id, tenantId: t.id, role: u.role, email: u.email });
   await audit(t.id, u.email, "staff.login");
-  redirect(`/${slug}/admin`);
+  redirect(u.role === "AGENT" ? `/${slug}/agent` : `/${slug}/admin`);
 }
 
 export async function staffLogout(slug: string) {
@@ -136,4 +136,45 @@ export async function saveSettings(slug: string, form: FormData) {
   await audit(t.id, s.email, "settings.saved");
   revalidatePath(`/${slug}`, "layout");
   redirect(`/${slug}/admin/settings?ok=1`);
+}
+
+export async function createAgent(slug: string, form: FormData) {
+  const t = await getTenant(slug);
+  const s = await requireStaff(t.id, slug, ["OWNER", "ADMIN"]);
+  const name = String(form.get("name") ?? "").trim();
+  const email = String(form.get("email") ?? "").trim().toLowerCase();
+  const phone = String(form.get("phone") ?? "").trim();
+  const password = String(form.get("password") ?? "");
+  if (!name || !/^\S+@\S+\.\S+$/.test(email) || password.length < 8) redirect(`/${slug}/admin/agents?e=fields`);
+  if (await db.staffUser.findUnique({ where: { tenantId_email: { tenantId: t.id, email } } })) redirect(`/${slug}/admin/agents?e=email`);
+  const tt = await db.tenant.update({ where: { id: t.id }, data: { agentSeq: { increment: 1 } } });
+  const agentCode = `AG${tt.agentSeq}`;
+  await db.staffUser.create({ data: { tenantId: t.id, name, email, phone, role: "AGENT", agentCode, passwordHash: await bcrypt.hash(password, 12) } });
+  await audit(t.id, s.email, "agent.created", agentCode);
+  redirect(`/${slug}/admin/agents?ok=${agentCode}`);
+}
+
+export async function setAgentActive(slug: string, form: FormData) {
+  const t = await getTenant(slug);
+  const s = await requireStaff(t.id, slug, ["OWNER", "ADMIN"]);
+  const id = String(form.get("agentId"));
+  const active = form.get("active") === "1";
+  const a = await db.staffUser.findFirst({ where: { id, tenantId: t.id, role: "AGENT" } });
+  if (!a) redirect(`/${slug}/admin/agents`);
+  await db.staffUser.update({ where: { id }, data: { active } });
+  await audit(t.id, s.email, active ? "agent.activated" : "agent.deactivated", a.agentCode ?? id);
+  redirect(`/${slug}/admin/agents`);
+}
+
+export async function resetAgentPassword(slug: string, form: FormData) {
+  const t = await getTenant(slug);
+  const s = await requireStaff(t.id, slug, ["OWNER", "ADMIN"]);
+  const id = String(form.get("agentId"));
+  const password = String(form.get("password") ?? "");
+  const a = await db.staffUser.findFirst({ where: { id, tenantId: t.id, role: "AGENT" } });
+  if (!a) redirect(`/${slug}/admin/agents`);
+  if (password.length < 8) redirect(`/${slug}/admin/agents?e=pw`);
+  await db.staffUser.update({ where: { id }, data: { passwordHash: await bcrypt.hash(password, 12) } });
+  await audit(t.id, s.email, "agent.password_reset", a.agentCode ?? id);
+  redirect(`/${slug}/admin/agents?pw=${a.agentCode}`);
 }
