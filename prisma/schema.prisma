@@ -313,7 +313,7 @@ model StaffUser {
   sold         Policy[]  @relation("SoldBy")
 
   @@unique([tenantId, email])
-  @@unique([tenantId, agentCode])
+  @@index([tenantId, agentCode]) // codes come from Tenant.agentSeq, so they're unique per funeral home
 }
 
 model Otp {
