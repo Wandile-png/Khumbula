@@ -136,9 +136,13 @@ export function SignupForm({ tenant, plans, initialPlan, initialAgent, banks }: 
       {step === 0 && (
         <div className="stack">
           {plans.map((x) => (
-            <label key={x.code} className="plan">
+            <label key={x.code} className={`plan${plan === x.code ? " selected" : ""}`}>
               <input type="radio" name="plan" checked={plan === x.code} onChange={() => setPlan(x.code)} />
               <PlanTable plan={x} />
+              <div className="pick" aria-hidden="true">
+                <span className="tick">{plan === x.code ? "✓" : ""}</span>
+                {plan === x.code ? "Selected" : "Tap to choose this plan"}
+              </div>
             </label>
           ))}
           <p className="note">A {tenant.waitingMonths}-month waiting period applies to death from natural causes. Accidental death is covered from your first paid premium.</p>
@@ -271,9 +275,20 @@ export function SignupForm({ tenant, plans, initialPlan, initialAgent, banks }: 
       )}
 
       {err("submit")}
-      <div className="row between">
-        {step > 0 ? <button type="button" className="btn ghost" onClick={() => { setErrors({}); setStep(step - 1); }}>Back</button> : <span />}
-        <button type="button" className="btn" onClick={next} disabled={busy}>{busy ? "Activating…" : step === 4 ? "Activate my policy" : "Continue"}</button>
+      <div className="actionbar">
+        <div className="actionbar-in">
+          {step > 0 ? (
+            <button type="button" className="btn ghost" onClick={() => { setErrors({}); setStep(step - 1); window.scrollTo(0, 0); }}>Back</button>
+          ) : (
+            <span className="pickedsum">
+              <span className="muted small">Your plan</span>
+              <b>{p.name}</b>
+            </span>
+          )}
+          <button type="button" className="btn primary" onClick={next} disabled={busy}>
+            {busy ? "Activating…" : step === 4 ? "Activate my policy" : "Continue →"}
+          </button>
+        </div>
       </div>
     </div>
   );
