@@ -178,3 +178,58 @@ export async function resetAgentPassword(slug: string, form: FormData) {
   await audit(t.id, s.email, "agent.password_reset", a.agentCode ?? id);
   redirect(`/${slug}/admin/agents?pw=${a.agentCode}`);
 }
+
+const STAFF_ROLES = ["OWNER", "ADMIN", "CLAIMS", "VIEWER"] as const;
+type StaffRoleName = (typeof STAFF_ROLES)[number];
+const asRole = (v: FormDataEntryValue | null): StaffRoleName | null => (STAFF_ROLES as readonly string[]).includes(String(v)) ? (String(v) as StaffRoleName) : null;
+
+async function activeOwners(tenantId: string) {
+  return db.staffUser.count({ where: { tenantId, role: "OWNER", active: true } });
+}
+
+export async function createStaff(slug: string, form: FormData) {
+  const t = await getTenant(slug);
+  const s = await requireStaff(t.id, slug, ["OWNER"]);
+  const name = String(form.get("name") ?? "").trim();
+  const email = String(form.get("email") ?? "").trim().toLowerCase();
+  const password = String(form.get("password") ?? "");
+  const role = asRole(form.get("role"));
+  if (!name || !/^\S+@\S+\.\S+$/.test(email) || password.length < 10 || !role) redirect(`/${slug}/admin/users?e=fields`);
+  if (await db.staffUser.findUnique({ where: { tenantId_email: { tenantId: t.id, email } } })) redirect(`/${slug}/admin/users?e=email`);
+  await db.staffUser.create({ data: { tenantId: t.id, name, email, role, passwordHash: await bcrypt.hash(password, 12) } });
+  await audit(t.id, s.email, "staff.created", email, { role });
+  redirect(`/${slug}/admin/users?ok=added`);
+}
+
+export async function updateStaff(slug: string, form: FormData) {
+  const t = await getTenant(slug);
+  const s = await requireStaff(t.id, slug, ["OWNER"]);
+  const id = String(form.get("userId"));
+  const u = await db.staffUser.findFirst({ where: { id, tenantId: t.id, role: { not: "AGENT" } } });
+  if (!u) redirect(`/${slug}/admin/users`);
+  const action = String(form.get("action"));
+
+  if (action === "role") {
+    const role = asRole(form.get("role"));
+    if (!role) redirect(`/${slug}/admin/users`);
+    if (u.role === "OWNER" && role !== "OWNER" && (await activeOwners(t.id)) <= 1) redirect(`/${slug}/admin/users?e=lastowner`);
+    await db.staffUser.update({ where: { id }, data: { role } });
+    await audit(t.id, s.email, "staff.role_changed", u.email, { from: u.role, to: role });
+    redirect(`/${slug}/admin/users?ok=role`);
+  }
+  if (action === "deactivate" || action === "activate") {
+    if (u.id === s.staffId) redirect(`/${slug}/admin/users?e=self`);
+    if (action === "deactivate" && u.role === "OWNER" && (await activeOwners(t.id)) <= 1) redirect(`/${slug}/admin/users?e=lastowner`);
+    await db.staffUser.update({ where: { id }, data: { active: action === "activate" } });
+    await audit(t.id, s.email, action === "activate" ? "staff.activated" : "staff.deactivated", u.email);
+    redirect(`/${slug}/admin/users?ok=${action}`);
+  }
+  if (action === "password") {
+    const password = String(form.get("password") ?? "");
+    if (password.length < 10) redirect(`/${slug}/admin/users?e=pw`);
+    await db.staffUser.update({ where: { id }, data: { passwordHash: await bcrypt.hash(password, 12) } });
+    await audit(t.id, s.email, "staff.password_reset", u.email);
+    redirect(`/${slug}/admin/users?ok=pw`);
+  }
+  redirect(`/${slug}/admin/users`);
+}

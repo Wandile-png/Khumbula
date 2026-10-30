@@ -1,6 +1,7 @@
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { db } from "./db";
 
 const secret = () => {
   const s = process.env.SESSION_SECRET;
@@ -48,7 +49,11 @@ export function endSession(kind: "staff" | "member") {
 
 export async function getStaff(tenantId: string) {
   const s = await read<StaffSession>(COOKIE.staff);
-  return s && s.tenantId === tenantId ? s : null;
+  if (!s || s.tenantId !== tenantId) return null;
+  // Look the person up each time, so a removed user or a changed role takes effect straight away.
+  const u = await db.staffUser.findUnique({ where: { id: s.staffId }, select: { active: true, role: true, email: true } });
+  if (!u || !u.active) return null;
+  return { ...s, role: u.role, email: u.email };
 }
 export async function getMember(tenantId: string) {
   const s = await read<MemberSession>(COOKIE.member);
